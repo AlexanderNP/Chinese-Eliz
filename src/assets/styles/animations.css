@@ -1,0 +1,89 @@
+/* ============================================
+   АНИМАЦИИ - БАЗОВЫЕ КЛАССЫ
+   ============================================ */
+
+/* Базовый класс для всех анимаций появления */
+.animate {
+  transition:
+    opacity var(--animation-duration) var(--animation-easing),
+    transform var(--animation-duration) var(--animation-easing);
+}
+
+/* ============================================
+   ТИПЫ АНИМАЦИЙ
+   ============================================ */
+
+/* Fade Up - появление снизу */
+.animate-fade-up {
+  opacity: 0;
+  transform: translateY(30px);
+}
+
+.animate-fade-up.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Fade In - простое появление */
+.animate-fade-in {
+  opacity: 0;
+}
+
+.animate-fade-in.is-visible {
+  opacity: 1;
+}
+
+/* Fade Left - появление слева */
+.animate-fade-left {
+  opacity: 0;
+  transform: translateX(30px);
+}
+
+.animate-fade-left.is-visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* Fade Right - появление справа */
+.animate-fade-right {
+  opacity: 0;
+  transform: translateX(-30px);
+}
+
+.animate-fade-right.is-visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* Scale In - появление с увеличением */
+.animate-scale-in {
+  opacity: 0;
+  transform: scale(0.9);
+}
+
+.animate-scale-in.is-visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Zoom Out - появление с уменьшением */
+.animate-zoom-out {
+  opacity: 0;
+  transform: scale(1.1);
+}
+
+.animate-zoom-out.is-visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Slide Down - появление сверху */
+.animate-slide-down {
+  opacity: 0;
+  transform: translateY(-30px);
+}
+
+.animate-slide-down.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
