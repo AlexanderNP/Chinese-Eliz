@@ -11,7 +11,7 @@
 
       <div class="contact-buttons" v-animate="{ delay: 200 }">
         <a 
-          href="https://t.me/zlmar" 
+          href="https://t.me/chinese_eliz" 
           class="contact-btn contact-btn--telegram"
           target="_blank"
           rel="noopener noreferrer"
