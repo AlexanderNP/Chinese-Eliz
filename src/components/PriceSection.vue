@@ -20,11 +20,11 @@
             <ul class="price-list">
               <li class="price-item">
                 <span class="price-duration">60 мин</span>
-                <span class="price-value">1 800 ₽</span>
+                <span class="price-value">1 900 ₽</span>
               </li>
               <li class="price-item">
                 <span class="price-duration">90 мин</span>
-                <span class="price-value">2 500 ₽</span>
+                <span class="price-value">2 800 ₽</span>
               </li>
             </ul>
           </div>
@@ -43,7 +43,7 @@
             <ul class="price-list">
               <li class="price-item">
                 <span class="price-duration">60 мин</span>
-                <span class="price-value">1 300 ₽</span>
+                <span class="price-value">1 500 ₽</span>
               </li>
             </ul>
           </div>
