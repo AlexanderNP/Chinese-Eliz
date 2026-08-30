@@ -1,13 +1,36 @@
 <script setup>
 import SliderComponent from './SliderComponent.vue';
-import lesson1 from '@/assets/example-leassons/leasson_1.jpg';
-import lesson2 from '@/assets/example-leassons/leasson_2.jpg';
-import lesson3 from '@/assets/example-leassons/leasson_3.jpg';
-import lesson4 from '@/assets/example-leassons/leasson_4.jpg';
-import lesson5 from '@/assets/example-leassons/leasson_5.jpg';
-import lesson6 from '@/assets/example-leassons/leasson_6.jpg';
+import lesson1 from '@/assets/example-lessons/lesson_01.webp';
+import lesson2 from '@/assets/example-lessons/lesson_02.webp';
+import lesson3 from '@/assets/example-lessons/lesson_03.webp';
+import lesson4 from '@/assets/example-lessons/lesson_04.webp';
+import lesson5 from '@/assets/example-lessons/lesson_05.webp';
+import lesson6 from '@/assets/example-lessons/lesson_06.webp';
+import lesson7 from '@/assets/example-lessons/lesson_07.webp';
+import lesson8 from '@/assets/example-lessons/lesson_08.webp';
+import lesson9 from '@/assets/example-lessons/lesson_09.webp';
+import lesson10 from '@/assets/example-lessons/lesson_10.webp';
+import lesson11 from '@/assets/example-lessons/lesson_11.webp';
+import lesson12 from '@/assets/example-lessons/lesson_12.webp';
+import lesson13 from '@/assets/example-lessons/lesson_13.webp';
+import lesson14 from '@/assets/example-lessons/lesson_14.webp';
 
-const slides = [lesson1, lesson2, lesson3, lesson4, lesson5, lesson6];
+const slides = [
+  lesson7,
+  lesson1,
+  lesson2,
+  lesson3,
+  lesson4,
+  lesson5,
+  lesson6,
+  lesson8,
+  lesson9,
+  lesson10,
+  lesson11,
+  lesson12,
+  lesson13,
+  lesson14,
+];
 </script>
 
 <template>
@@ -19,13 +42,17 @@ const slides = [lesson1, lesson2, lesson3, lesson4, lesson5, lesson6];
       </p>
 
       <div class="examples-slider-wrapper" v-animate="{ delay: 200 }">
-        <SliderComponent :slides="slides">
-          <div 
-            v-for="(slide, index) in slides" 
-            :key="index"
-            class="examples-slide"
-          >
-            <img :src="slide" :alt="`Урок ${index + 1}`" class="examples-slide__image" loading="lazy">
+        <SliderComponent v-slot="{ slide, index }" :slides="slides" label="Примеры уроков">
+          <div class="examples-slide">
+            <img
+              class="examples-slide__image"
+              :src="slide"
+              :alt="`Пример урока ${index + 1}`"
+              width="1280"
+              height="720"
+              decoding="async"
+              :loading="index === 0 ? 'eager' : 'lazy'"
+            >
           </div>
         </SliderComponent>
       </div>
@@ -91,43 +118,26 @@ const slides = [lesson1, lesson2, lesson3, lesson4, lesson5, lesson6];
    ============================================ */
 
 .examples-slide {
-  flex: 0 0 100%;
-  width: 100%;
-  max-width: 100%;
-  scroll-snap-align: center;
-  border-radius: clamp(1rem, 2vw, 1.5rem);
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(62, 39, 35, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
+/*
+  У картинок собственная скруглённая рамка и прозрачные углы,
+  поэтому никакой рамки/фона от контейнера — только мягкая тень по силуэту.
+*/
 .examples-slide__image {
   width: 100%;
   height: auto;
-  aspect-ratio: 16 / 9;
-  object-fit: cover;
   display: block;
-  transition: transform 0.3s ease;
-}
-
-.examples-slide:hover .examples-slide__image {
-  transform: scale(1.02);
+  filter: drop-shadow(0 10px 24px rgba(62, 39, 35, 0.14));
 }
 
 /* Адаптивность */
 @media (max-width: 768px) {
   .examples-title {
     font-size: clamp(2rem, 4vw, 3rem);
-  }
-
-  .examples-slider-wrapper {
-    max-width: clamp(400px, 85vw, 700px);
-  }
-}
-
-@media (max-width: 480px) {
-  .examples-slider-wrapper {
-    max-width: clamp(320px, 90vw, 500px);
   }
 }
 

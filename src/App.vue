@@ -2,7 +2,7 @@
 import HeroSection from './components/HeroSection.vue';
 import AboutSection from './components/AboutSection.vue';
 import WhyTrustMeSection from './components/WhyTrustMeSection.vue';
-import ExampleLeassonsSection from './components/ExampleLeassonsSection.vue';
+import ExampleLessonsSection from './components/ExampleLessonsSection.vue';
 import TypeClassesByPriceSection from './components/PriceSection.vue';
 import ReviewsSection from './components/ReviewsSection.vue';
 import ContactUs from './components/ContactUs.vue';
@@ -13,7 +13,7 @@ import ContactUs from './components/ContactUs.vue';
     <HeroSection />
     <AboutSection />
     <WhyTrustMeSection />
-    <ExampleLeassonsSection />
+    <ExampleLessonsSection />
     <TypeClassesByPriceSection />
     <ReviewsSection />
     <ContactUs />

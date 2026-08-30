@@ -1,10 +1,28 @@
 <script setup>
 import SliderComponent from './SliderComponent.vue';
-import review1 from '@/assets/reviews/review1.jpg';
-import review2 from '@/assets/reviews/review2.jpg';
-import review3 from '@/assets/reviews/review3.jpg';
+import review1 from '@/assets/reviews/review1.webp';
+import review2 from '@/assets/reviews/review2.webp';
+import review3 from '@/assets/reviews/review3.webp';
+import review4 from '@/assets/reviews/review-01.webp';
+import review5 from '@/assets/reviews/review-02.webp';
+import review6 from '@/assets/reviews/review-03.webp';
+import review7 from '@/assets/reviews/review-04.webp';
+import review8 from '@/assets/reviews/review-06.webp';
 
-const slides = [review1, review2, review3];
+/*
+  Размеры указаны явно: скриншоты разной высоты, и без width/height
+  ленивая картинка до загрузки занимает 0px — высота слайдера прыгала бы при листании.
+*/
+const slides = [
+  { src: review1, width: 508, height: 169 },
+  { src: review2, width: 508, height: 262 },
+  { src: review3, width: 508, height: 324 },
+  { src: review4, width: 510, height: 146 },
+  { src: review5, width: 510, height: 97 },
+  { src: review6, width: 482, height: 69 },
+  { src: review7, width: 390, height: 68 },
+  { src: review8, width: 524, height: 176 },
+];
 </script>
 
 <template>
@@ -16,13 +34,17 @@ const slides = [review1, review2, review3];
       </p>
 
       <div class="reviews-slider-wrapper" v-animate="{ delay: 200 }">
-        <SliderComponent :slides="slides">
-          <div 
-            v-for="(slide, index) in slides" 
-            :key="index"
-            class="reviews-slide"
-          >
-            <img :src="slide" :alt="`Отзыв ${index + 1}`" class="reviews-slide__image" loading="lazy">
+        <SliderComponent v-slot="{ slide, index }" :slides="slides" label="Отзывы учеников">
+          <div class="reviews-slide">
+            <img
+              class="reviews-slide__image"
+              :src="slide.src"
+              :alt="`Отзыв ${index + 1}`"
+              :width="slide.width"
+              :height="slide.height"
+              decoding="async"
+              :loading="index === 0 ? 'eager' : 'lazy'"
+            >
           </div>
         </SliderComponent>
       </div>
@@ -79,7 +101,8 @@ const slides = [review1, review2, review3];
 
 .reviews-slider-wrapper {
   width: 100%;
-  max-width: clamp(400px, 60vw, 700px);
+  /* хватает, чтобы самый широкий скриншот (524px) поместился между стрелками без масштабирования */
+  max-width: 700px;
   margin: 0 auto;
 }
 
@@ -87,48 +110,34 @@ const slides = [review1, review2, review3];
    СТИЛИ СЛАЙДОВ
    ============================================ */
 
+/*
+  Скриншоты переписки разной высоты. Слайды — flex-элементы одного трека,
+  поэтому высота трека равна самому высокому отзыву и не скачет при листании,
+  а короткие отзывы просто центрируются внутри своей ячейки.
+*/
 .reviews-slide {
-  flex: 0 0 auto;
-  width: auto;
-  max-width: 100%;
-  scroll-snap-align: center;
-  border-radius: clamp(1rem, 2vw, 1.5rem);
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(62, 39, 35, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(0.5rem, 2vw, 1rem);
 }
 
+/*
+  Ширина по натуральному размеру: скриншоты 390–524px, растягивать их
+  на всю ширину слайдера значит замылить текст.
+*/
 .reviews-slide__image {
   width: auto;
   height: auto;
   max-width: 100%;
-  max-height: 600px;
-  object-fit: contain;
   display: block;
+  filter: drop-shadow(0 8px 20px rgba(62, 39, 35, 0.12));
 }
 
 /* Адаптивность */
 @media (max-width: 768px) {
   .reviews-title {
     font-size: clamp(2rem, 4vw, 3rem);
-  }
-
-  .reviews-slider-wrapper {
-    max-width: clamp(380px, 78vw, 580px);
-  }
-
-  .reviews-slide__image {
-    max-height: 520px;
-  }
-}
-
-@media (max-width: 480px) {
-  .reviews-slider-wrapper {
-    max-width: clamp(300px, 88vw, 420px);
-  }
-
-  .reviews-slide__image {
-    max-height: 420px;
   }
 }
 

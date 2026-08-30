@@ -1,140 +1,338 @@
 <script setup>
-import { ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 const props = defineProps({
   slides: {
     type: Array,
     required: true,
   },
+  label: {
+    type: String,
+    default: 'Слайдер',
+  },
 });
 
-const sliderRef = ref(null);
-const currentIndex = ref(0);
+/** Пауза без событий прокрутки, после которой считаем, что пользователь долистал. */
+const SETTLE_DELAY = 150;
+
+const viewportRef = ref(null);
+const trackRef = ref(null);
+
+/** Позиция внутри трека — с учётом клонов, а не индекс слайда. */
+const position = ref(0);
+
+const isLooped = computed(() => props.slides.length > 1);
+
+/*
+  Бесконечная прокрутка: по краям трека лежат клоны последнего и первого слайда.
+  Когда прокрутка останавливается на клоне, мгновенно переставляем scrollLeft
+  на его оригинал — подмена не видна, потому что под курсором та же картинка.
+*/
+const trackSlides = computed(() => {
+  const items = props.slides.map((slide, index) => ({ slide, index, key: `slide-${index}` }));
+  if (!isLooped.value) {
+    return items;
+  }
+
+  const lastIndex = props.slides.length - 1;
+
+  return [
+    { slide: props.slides[lastIndex], index: lastIndex, key: 'clone-last' },
+    ...items,
+    { slide: props.slides[0], index: 0, key: 'clone-first' },
+  ];
+});
+
+const firstPosition = computed(() => (isLooped.value ? 1 : 0));
+const lastPosition = computed(() => firstPosition.value + props.slides.length - 1);
+
+const currentIndex = computed(() => trackSlides.value[position.value]?.index ?? 0);
+
+let scrollFrameId = null;
+let settleTimerId = null;
+let resizeObserver = null;
+
+const prefersReducedMotion = () =>
+  window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const getSlideElements = () => (trackRef.value ? Array.from(trackRef.value.children) : []);
+
+const getMaxScroll = () => {
+  const viewport = viewportRef.value;
+  return viewport ? Math.max(0, viewport.scrollWidth - viewport.clientWidth) : 0;
+};
+
+/**
+ * Геометрия слайда в системе координат прокрутки вьюпорта.
+ * Считаем по реальным рамкам элементов, а не по clientWidth вьюпорта:
+ * между слайдами есть gap, а у трека — вертикальный padding.
+ */
+const measureSlide = (element) => {
+  const viewport = viewportRef.value;
+  const viewportLeft = viewport.getBoundingClientRect().left;
+  const rect = element.getBoundingClientRect();
+  const start = viewport.scrollLeft + (rect.left - viewportLeft);
+
+  return { start, width: rect.width, center: start + rect.width / 2 };
+};
+
+/** Позиция слайда, центр которого ближе всего к центру вьюпорта. */
+const resolvePosition = () => {
+  const viewport = viewportRef.value;
+  const elements = getSlideElements();
+  if (!viewport || elements.length === 0) {
+    return 0;
+  }
+
+  // В крайних позициях слайд физически не может встать по центру,
+  // поэтому края трактуем однозначно — иначе крайние точки никогда не активируются.
+  const maxScroll = getMaxScroll();
+  if (viewport.scrollLeft <= 1) {
+    return 0;
+  }
+  if (viewport.scrollLeft >= maxScroll - 1) {
+    return elements.length - 1;
+  }
+
+  const viewportCenter = viewport.scrollLeft + viewport.clientWidth / 2;
+  let closestPosition = 0;
+  let closestDistance = Infinity;
+
+  elements.forEach((element, index) => {
+    const distance = Math.abs(measureSlide(element).center - viewportCenter);
+    if (distance < closestDistance) {
+      closestDistance = distance;
+      closestPosition = index;
+    }
+  });
+
+  return closestPosition;
+};
+
+const scrollToPosition = (index, behavior = 'auto') => {
+  const viewport = viewportRef.value;
+  const element = getSlideElements()[index];
+  if (!viewport || !element) {
+    return;
+  }
+
+  const { start, width } = measureSlide(element);
+  const target = start - (viewport.clientWidth - width) / 2;
+
+  position.value = index;
+  viewport.scrollTo({
+    left: Math.max(0, Math.min(target, getMaxScroll())),
+    behavior,
+  });
+};
+
+const smoothBehavior = () => (prefersReducedMotion() ? 'auto' : 'smooth');
+
+/** Уводит прокрутку с клона на его оригинал без анимации. Возвращает актуальную позицию. */
+const teleportFromClone = () => {
+  if (!isLooped.value) {
+    return position.value;
+  }
+
+  if (position.value === 0) {
+    scrollToPosition(lastPosition.value);
+    return lastPosition.value;
+  }
+
+  if (position.value === trackSlides.value.length - 1) {
+    scrollToPosition(firstPosition.value);
+    return firstPosition.value;
+  }
+
+  return position.value;
+};
+
+const step = (delta) => {
+  if (!isLooped.value) {
+    return;
+  }
+  // С клонов уходим заранее, иначе следующий шаг вышел бы за границы трека.
+  scrollToPosition(teleportFromClone() + delta, smoothBehavior());
+};
+
+const goToPrevious = () => step(-1);
+const goToNext = () => step(1);
 
 const goToSlide = (index) => {
-  currentIndex.value = index;
-  if (sliderRef.value) {
-    const slideWidth = sliderRef.value.clientWidth;
-    sliderRef.value.scrollTo({
-      left: slideWidth * index,
-      behavior: 'smooth',
-    });
-  }
-};
-
-const goToPrevious = () => {
-  const newIndex = currentIndex.value === 0 ? props.slides.length - 1 : currentIndex.value - 1;
-  goToSlide(newIndex);
-};
-
-const goToNext = () => {
-  const newIndex = currentIndex.value === props.slides.length - 1 ? 0 : currentIndex.value + 1;
-  goToSlide(newIndex);
+  teleportFromClone();
+  scrollToPosition(firstPosition.value + index, smoothBehavior());
 };
 
 const handleScroll = () => {
-  if (sliderRef.value) {
-    const slideWidth = sliderRef.value.clientWidth;
-    const newIndex = Math.round(sliderRef.value.scrollLeft / slideWidth);
-    if (newIndex !== currentIndex.value) {
-      currentIndex.value = newIndex;
-    }
+  clearTimeout(settleTimerId);
+  settleTimerId = setTimeout(teleportFromClone, SETTLE_DELAY);
+
+  if (scrollFrameId !== null) {
+    return;
+  }
+  scrollFrameId = requestAnimationFrame(() => {
+    scrollFrameId = null;
+    position.value = resolvePosition();
+  });
+};
+
+const handleKeydown = (event) => {
+  if (event.key === 'ArrowLeft') {
+    event.preventDefault();
+    goToPrevious();
+  } else if (event.key === 'ArrowRight') {
+    event.preventDefault();
+    goToNext();
   }
 };
 
-watch(() => props.slides, () => {
-  currentIndex.value = 0;
-}, { immediate: true });
+const reset = () => {
+  scrollToPosition(firstPosition.value);
+  position.value = firstPosition.value;
+};
+
+onMounted(() => {
+  reset();
+
+  if ('ResizeObserver' in window) {
+    resizeObserver = new ResizeObserver(() => {
+      position.value = resolvePosition();
+    });
+    resizeObserver.observe(viewportRef.value);
+    resizeObserver.observe(trackRef.value);
+  }
+});
+
+onBeforeUnmount(() => {
+  if (scrollFrameId !== null) {
+    cancelAnimationFrame(scrollFrameId);
+  }
+  clearTimeout(settleTimerId);
+  resizeObserver?.disconnect();
+});
+
+watch(
+  () => props.slides,
+  async () => {
+    await nextTick();
+    reset();
+  },
+);
 </script>
 
 <template>
-  <div class="slider-component">
-    <div class="slider-component__wrapper">
-      <button 
-        class="slider-component__btn slider-component__btn--left" 
-        @click="goToPrevious"
+  <div class="slider" role="group" aria-roledescription="карусель" :aria-label="label">
+    <div class="slider__wrapper">
+      <button
+        v-if="isLooped"
+        class="slider__arrow slider__arrow--previous"
         type="button"
         aria-label="Предыдущий слайд"
+        @click="goToPrevious"
       >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
           <path d="M15 18l-6-6 6-6" />
         </svg>
       </button>
 
-      <div 
-        ref="sliderRef"
-        class="slider-component__container"
-        @scroll="handleScroll"
+      <div
+        ref="viewportRef"
+        class="slider__viewport"
+        tabindex="0"
+        @scroll.passive="handleScroll"
+        @keydown="handleKeydown"
       >
-        <div class="slider-component__track">
-          <slot />
+        <div ref="trackRef" class="slider__track">
+          <template v-for="item in trackSlides" :key="item.key">
+            <slot :slide="item.slide" :index="item.index" />
+          </template>
         </div>
       </div>
 
-      <button 
-        class="slider-component__btn slider-component__btn--right" 
-        @click="goToNext"
+      <button
+        v-if="isLooped"
+        class="slider__arrow slider__arrow--next"
         type="button"
         aria-label="Следующий слайд"
+        @click="goToNext"
       >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
           <path d="M9 18l6-6-6-6" />
         </svg>
       </button>
     </div>
 
-    <div class="slider-component__dots">
+    <div v-if="isLooped" class="slider__dots">
       <button
         v-for="(_, index) in slides"
         :key="index"
-        class="slider-component__dot"
-        :class="{ 'slider-component__dot--active': index === currentIndex }"
-        @click="goToSlide(index)"
+        class="slider__dot"
+        :class="{ 'slider__dot--active': index === currentIndex }"
         type="button"
         :aria-label="`Перейти к слайду ${index + 1}`"
+        :aria-current="index === currentIndex ? 'true' : undefined"
+        @click="goToSlide(index)"
       />
     </div>
   </div>
 </template>
 
 <style scoped>
-.slider-component {
+.slider {
   width: 100%;
 }
 
-.slider-component__wrapper {
-  position: relative;
-  width: 100%;
+.slider__wrapper {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: clamp(0.5rem, 2vw, 1.25rem);
 }
 
-.slider-component__container {
-  flex: 1;
+.slider__viewport {
+  flex: 1 1 auto;
+  /* без min-width: 0 flex-элемент не даёт треку переполниться и прокрутка ломается */
+  min-width: 0;
   overflow-x: auto;
   overflow-y: hidden;
   scroll-snap-type: x mandatory;
-  scroll-behavior: smooth;
+  overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
   -ms-overflow-style: none;
+  border-radius: clamp(1rem, 2vw, 1.5rem);
 }
 
-.slider-component__container::-webkit-scrollbar {
+.slider__viewport::-webkit-scrollbar {
   display: none;
 }
 
-.slider-component__track {
-  display: flex;
-  gap: 1rem;
-  padding: 0.5rem;
+.slider__viewport:focus-visible {
+  outline: 2px solid var(--color-espresso);
+  outline-offset: 4px;
 }
 
-.slider-component__btn {
-  flex: 0 0 48px;
-  width: 48px;
-  height: 48px;
+.slider__track {
+  display: flex;
+  align-items: stretch;
+  gap: clamp(0.75rem, 2vw, 1.5rem);
+  padding-block: 0.5rem;
+}
+
+/*
+  Слайды приходят через слот, поэтому размер задаём здесь и только здесь:
+  ровно одна ширина вьюпорта на слайд — от этого зависит и снап, и подсветка точек.
+*/
+.slider__track > :deep(*) {
+  flex: 0 0 100%;
+  max-width: 100%;
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
+}
+
+.slider__arrow {
+  flex: 0 0 auto;
+  width: clamp(40px, 5vw, 48px);
+  height: clamp(40px, 5vw, 48px);
   border-radius: 50%;
   border: 1px solid var(--color-espresso);
   background: transparent;
@@ -143,85 +341,80 @@ watch(() => props.slides, () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
   padding: 0;
-  flex-shrink: 0;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease;
 }
 
-.slider-component__btn:hover {
+.slider__arrow svg {
+  width: 45%;
+  height: 45%;
+}
+
+.slider__arrow:hover {
   background: var(--color-espresso);
   color: var(--color-peony);
 }
 
-.slider-component__btn:active {
-  transform: scale(0.9);
+.slider__arrow:active {
+  transform: scale(0.92);
 }
 
-.slider-component__btn svg {
-  width: 20px;
-  height: 20px;
-}
-
-.slider-component__dots {
+.slider__dots {
   display: flex;
-  gap: 0.75rem;
+  flex-wrap: wrap;
   justify-content: center;
-  margin-top: 1.5rem;
+  gap: 0.5rem;
+  max-width: 100%;
+  margin-top: clamp(1rem, 2.5vw, 1.5rem);
 }
 
-.slider-component__dot {
+.slider__dot {
   width: 10px;
   height: 10px;
-  border-radius: 50%;
-  border: 2px solid var(--color-espresso);
+  border-radius: 999px;
+  border: 1px solid var(--color-espresso);
   background: transparent;
   cursor: pointer;
   padding: 0;
-  transition: all 0.3s ease;
+  transition:
+    width 0.3s ease,
+    background-color 0.3s ease,
+    opacity 0.3s ease;
+  opacity: 0.5;
 }
 
-.slider-component__dot:hover {
-  background: rgba(244, 201, 214, 0.5);
-  transform: scale(1.2);
+.slider__dot:hover {
+  opacity: 1;
+  background: rgba(244, 201, 214, 0.6);
 }
 
-.slider-component__dot--active {
+.slider__dot--active {
+  width: 26px;
+  opacity: 1;
   background: var(--color-espresso);
-  transform: scale(1.3);
 }
 
-@media (max-width: 768px) {
-  .slider-component__wrapper {
-    gap: 0.5rem;
-  }
-
-  .slider-component__btn {
-    width: 44px;
-    height: 44px;
-    flex: 0 0 44px;
-  }
-
-  .slider-component__btn svg {
-    width: 18px;
-    height: 18px;
+/* На тач-экранах листают свайпом — стрелки только съедают ширину слайда. */
+@media (max-width: 640px) {
+  .slider__arrow {
+    display: none;
   }
 }
 
-@media (max-width: 480px) {
-  .slider-component__btn {
-    width: 40px;
-    height: 40px;
-    flex: 0 0 40px;
+@media (hover: none) {
+  .slider__arrow:hover {
+    background: transparent;
+    color: var(--color-espresso);
   }
+}
 
-  .slider-component__btn svg {
-    width: 18px;
-    height: 18px;
-  }
-
-  .slider-component__dot {
-    width: 8px;
-    height: 8px;
+@media (prefers-reduced-motion: reduce) {
+  .slider__arrow,
+  .slider__dot {
+    transition: none;
   }
 }
 </style>
